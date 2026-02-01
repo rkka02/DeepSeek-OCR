@@ -5,6 +5,9 @@ __pycache__/
 output/
 *.mmd
 
+# Local clones / experiments
+external/
+
 # Local test/sample inputs
 test.pdf
 wolf.pdf

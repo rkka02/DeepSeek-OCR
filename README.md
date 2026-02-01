@@ -93,6 +93,10 @@ pip install flash-attn==2.7.3 --no-build-isolation
 ```Shell
 cd DeepSeek-OCR-master/DeepSeek-OCR-vllm
 ```
+
+### Apple Silicon (macOS) note
+If you're on an Apple Silicon Mac and want to try **Metal/MLX acceleration**, see:
+`DeepSeek-OCR-master/DeepSeek-OCR-vllm-metal/README.md`
 1. image: streaming output
 ```Shell
 python run_dpsk_ocr_image.py
