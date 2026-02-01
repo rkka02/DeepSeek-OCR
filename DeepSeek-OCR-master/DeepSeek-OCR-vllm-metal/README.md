@@ -58,6 +58,10 @@ Same idea as above: the scripts will install a runtime stub for Transformers aut
 so **vLLM can import** (useful for text-only smoke tests). If you're running a multimodal model
 and it fails later, you'll need to repair the Transformers install in that venv.
 
+### If you see `cannot import name 'LLM' from 'vllm'`
+Some vLLM builds don't re-export `LLM` from `vllm.__init__`. The scripts try
+`vllm.entrypoints.llm.LLM` first and fall back to `from vllm import LLM`.
+
 ### Install only the PDF/image utilities needed by the scripts
 From this folder:
 

@@ -192,6 +192,20 @@ def _ensure_transformers_auto_stubs_if_missing() -> None:
             _install_stub(name, e)
 
 
+def _import_vllm_llm_and_sampling_params():
+    try:
+        from vllm.entrypoints.llm import LLM  # type: ignore
+    except Exception:
+        from vllm import LLM  # type: ignore
+
+    try:
+        from vllm.sampling_params import SamplingParams  # type: ignore
+    except Exception:
+        from vllm import SamplingParams  # type: ignore
+
+    return LLM, SamplingParams
+
+
 def clean_markdown(text: str, *, strip_refs: bool = True) -> str:
     # DeepSeek uses this token sometimes when skip_special_tokens=False.
     text = text.replace("<｜end▁of▁sentence｜>", "")
@@ -303,7 +317,7 @@ def main() -> int:
     _ensure_transformers_auto_stubs_if_missing()
 
     try:
-        from vllm import LLM, SamplingParams
+        LLM, SamplingParams = _import_vllm_llm_and_sampling_params()
         from vllm.platforms import current_platform
     except Exception as e:
         print("ERROR: vLLM is not importable in this environment.")

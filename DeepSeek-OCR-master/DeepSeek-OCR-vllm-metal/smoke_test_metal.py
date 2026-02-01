@@ -225,6 +225,22 @@ def _ensure_transformers_auto_stubs_if_missing() -> None:
             _install_stub(name, e)
 
 
+def _import_vllm_llm_and_sampling_params():
+    """Import vLLM APIs across versions / partial installs."""
+    # Some builds may not re-export LLM from `vllm.__init__`.
+    try:
+        from vllm.entrypoints.llm import LLM  # type: ignore
+    except Exception:
+        from vllm import LLM  # type: ignore
+
+    try:
+        from vllm.sampling_params import SamplingParams  # type: ignore
+    except Exception:
+        from vllm import SamplingParams  # type: ignore
+
+    return LLM, SamplingParams
+
+
 def _try_print_vllm_platform() -> None:
     try:
         from vllm.platforms import current_platform
@@ -295,7 +311,7 @@ def main() -> int:
     _ensure_transformers_auto_stubs_if_missing()
 
     try:
-        from vllm import LLM, SamplingParams
+        LLM, SamplingParams = _import_vllm_llm_and_sampling_params()
     except Exception as e:
         print("ERROR: vLLM is not importable in this environment.")
         print(f"Details: {type(e).__name__}: {e}")
