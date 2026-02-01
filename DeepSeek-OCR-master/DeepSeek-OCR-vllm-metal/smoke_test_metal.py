@@ -176,6 +176,55 @@ def _ensure_auto_image_processor_stub_if_missing() -> None:
         )
 
 
+def _ensure_transformers_auto_stubs_if_missing() -> None:
+    """Ensure transformers auto-* imports won't crash vLLM import.
+
+    vLLM imports a few auto classes unconditionally:
+      - AutoProcessor
+      - AutoImageProcessor
+      - AutoFeatureExtractor
+      - AutoVideoProcessor
+
+    Some environments have a partially-broken Transformers install where these
+    lazy imports fail. We install stubs so vLLM can import and run text-only
+    flows. If a model actually relies on these classes at runtime, the stub
+    will raise with a clear error message.
+    """
+    try:
+        import transformers
+    except Exception:
+        return
+
+    def _install_stub(attr_name: str, original_exc: Exception) -> None:
+        class _Stub:
+            @classmethod
+            def from_pretrained(cls, *args, **kwargs):
+                raise RuntimeError(
+                    f"{attr_name} is not available in this environment. "
+                    "Install missing vision/audio deps and ensure your Transformers "
+                    "install is healthy. "
+                    f"Original error: {type(original_exc).__name__}: {original_exc}"
+                )
+
+        setattr(transformers, attr_name, _Stub)  # type: ignore[attr-defined]
+        print(
+            f"WARNING: {attr_name} could not be imported; installed a stub. "
+            "Text-only models should work; some multimodal models may not."
+        )
+
+    for name in (
+        "AutoProcessor",
+        "AutoImageProcessor",
+        "AutoFeatureExtractor",
+        "AutoVideoProcessor",
+    ):
+        try:
+            # Accessing the attribute can trigger a lazy import and raise.
+            getattr(transformers, name)
+        except Exception as e:
+            _install_stub(name, e)
+
+
 def _try_print_vllm_platform() -> None:
     try:
         from vllm.platforms import current_platform
@@ -243,6 +292,7 @@ def main() -> int:
     _ensure_allowed_layer_types()
     _ensure_torchvision_stub_if_broken()
     _ensure_auto_image_processor_stub_if_missing()
+    _ensure_transformers_auto_stubs_if_missing()
 
     try:
         from vllm import LLM, SamplingParams

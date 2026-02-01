@@ -156,6 +156,42 @@ def _ensure_auto_image_processor_stub_if_missing() -> None:
         )
 
 
+def _ensure_transformers_auto_stubs_if_missing() -> None:
+    """Ensure transformers auto-* imports won't crash vLLM import."""
+    try:
+        import transformers
+    except Exception:
+        return
+
+    def _install_stub(attr_name: str, original_exc: Exception) -> None:
+        class _Stub:
+            @classmethod
+            def from_pretrained(cls, *args, **kwargs):
+                raise RuntimeError(
+                    f"{attr_name} is not available in this environment. "
+                    "Install missing vision/audio deps and ensure your Transformers "
+                    "install is healthy. "
+                    f"Original error: {type(original_exc).__name__}: {original_exc}"
+                )
+
+        setattr(transformers, attr_name, _Stub)  # type: ignore[attr-defined]
+        print(
+            f"WARNING: {attr_name} could not be imported; installed a stub. "
+            "Text-only models should work; some multimodal models may not."
+        )
+
+    for name in (
+        "AutoProcessor",
+        "AutoImageProcessor",
+        "AutoFeatureExtractor",
+        "AutoVideoProcessor",
+    ):
+        try:
+            getattr(transformers, name)
+        except Exception as e:
+            _install_stub(name, e)
+
+
 def clean_markdown(text: str, *, strip_refs: bool = True) -> str:
     # DeepSeek uses this token sometimes when skip_special_tokens=False.
     text = text.replace("<｜end▁of▁sentence｜>", "")
@@ -264,6 +300,7 @@ def main() -> int:
     _ensure_allowed_layer_types()
     _ensure_torchvision_stub_if_broken()
     _ensure_auto_image_processor_stub_if_missing()
+    _ensure_transformers_auto_stubs_if_missing()
 
     try:
         from vllm import LLM, SamplingParams

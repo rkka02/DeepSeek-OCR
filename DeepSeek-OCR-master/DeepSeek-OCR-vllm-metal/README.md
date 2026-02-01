@@ -53,6 +53,11 @@ This means Transformers’ vision stack is partially unavailable.
 For these scripts, we also auto-install a small runtime stub so **vLLM can import**,
 but some models that rely on `AutoImageProcessor` may still fail at runtime.
 
+### If you see `Could not import module 'AutoProcessor'`
+Same idea as above: the scripts will install a runtime stub for Transformers auto-* classes
+so **vLLM can import** (useful for text-only smoke tests). If you're running a multimodal model
+and it fails later, you'll need to repair the Transformers install in that venv.
+
 ### Install only the PDF/image utilities needed by the scripts
 From this folder:
 
