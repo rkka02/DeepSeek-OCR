@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+
+# Local outputs / artifacts
+output/
+*.mmd
+
+# Local test/sample inputs
+test.pdf
+wolf.pdf

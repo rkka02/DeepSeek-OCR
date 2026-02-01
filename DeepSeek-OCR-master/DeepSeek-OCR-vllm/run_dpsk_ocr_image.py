@@ -19,7 +19,7 @@ import numpy as np
 from tqdm import tqdm
 from process.ngram_norepeat import NoRepeatNGramLogitsProcessor
 from process.image_process import DeepseekOCRProcessor
-from config import MODEL_PATH, INPUT_PATH, OUTPUT_PATH, PROMPT, CROP_MODE
+from config import MODEL_PATH, INPUT_PATH, OUTPUT_PATH, PROMPT, CROP_MODE, SAVE_MARKDOWN_ONLY
 
 
 
@@ -204,7 +204,8 @@ async def stream_generate(image=None, prompt=''):
 if __name__ == "__main__":
 
     os.makedirs(OUTPUT_PATH, exist_ok=True)
-    os.makedirs(f'{OUTPUT_PATH}/images', exist_ok=True)
+    if not SAVE_MARKDOWN_ONLY:
+        os.makedirs(f'{OUTPUT_PATH}/images', exist_ok=True)
 
     image = load_image(INPUT_PATH).convert('RGB')
 
@@ -233,12 +234,14 @@ if __name__ == "__main__":
             afile.write(outputs)
 
         matches_ref, matches_images, mathes_other = re_match(outputs)
-        # print(matches_ref)
-        result = process_image_with_refs(image_draw, matches_ref)
+        if not SAVE_MARKDOWN_ONLY:
+            result = process_image_with_refs(image_draw, matches_ref)
 
-
-        for idx, a_match_image in enumerate(tqdm(matches_images, desc="image")):
-            outputs = outputs.replace(a_match_image, f'![](images/' + str(idx) + '.jpg)\n')
+            for idx, a_match_image in enumerate(tqdm(matches_images, desc="image")):
+                outputs = outputs.replace(a_match_image, f'![](images/' + str(idx) + '.jpg)\n')
+        else:
+            for a_match_image in tqdm(matches_images, desc="image"):
+                outputs = outputs.replace(a_match_image, '')
 
         for idx, a_match_other in enumerate(tqdm(mathes_other, desc="other")):
             outputs = outputs.replace(a_match_other, '').replace('\\coloneqq', ':=').replace('\\eqqcolon', '=:')
@@ -248,7 +251,7 @@ if __name__ == "__main__":
         with open(f'{OUTPUT_PATH}/result.mmd', 'w', encoding = 'utf-8') as afile:
             afile.write(outputs)
 
-        if 'line_type' in outputs:
+        if (not SAVE_MARKDOWN_ONLY) and ('line_type' in outputs):
             import matplotlib.pyplot as plt
             from matplotlib.patches import Circle
             lines = eval(outputs)['Line']['line']
@@ -300,4 +303,5 @@ if __name__ == "__main__":
             plt.savefig(f'{OUTPUT_PATH}/geo.jpg')
             plt.close()
 
-        result.save(f'{OUTPUT_PATH}/result_with_boxes.jpg')
+        if not SAVE_MARKDOWN_ONLY:
+            result.save(f'{OUTPUT_PATH}/result_with_boxes.jpg')

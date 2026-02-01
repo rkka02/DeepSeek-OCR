@@ -16,13 +16,17 @@ PRINT_NUM_VIS_TOKENS = False
 SKIP_REPEAT = True
 MODEL_PATH = 'deepseek-ai/DeepSeek-OCR' # change to your model path
 
+# Output controls
+# If True, only markdown files are saved (no cropped images / visualization images / layouts PDF).
+SAVE_MARKDOWN_ONLY = True
+
 # TODO: change INPUT_PATH
 # .pdf: run_dpsk_ocr_pdf.py; 
 # .jpg, .png, .jpeg: run_dpsk_ocr_image.py; 
 # Omnidocbench images path: run_dpsk_ocr_eval_batch.py
 
-INPUT_PATH = '' 
-OUTPUT_PATH = ''
+INPUT_PATH = "C:\rkka_Projects\DeepSeek-OCR\test.pdf" 
+OUTPUT_PATH = "C:\rkka_Projects\DeepSeek-OCR\output"
 
 PROMPT = '<image>\n<|grounding|>Convert the document to markdown.'
 # PROMPT = '<image>\nFree OCR.'

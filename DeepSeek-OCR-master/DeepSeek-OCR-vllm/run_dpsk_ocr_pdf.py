@@ -14,7 +14,7 @@ os.environ['VLLM_USE_V1'] = '0'
 os.environ["CUDA_VISIBLE_DEVICES"] = '0'
 
 
-from config import MODEL_PATH, INPUT_PATH, OUTPUT_PATH, PROMPT, SKIP_REPEAT, MAX_CONCURRENCY, NUM_WORKERS, CROP_MODE
+from config import MODEL_PATH, INPUT_PATH, OUTPUT_PATH, PROMPT, SKIP_REPEAT, MAX_CONCURRENCY, NUM_WORKERS, CROP_MODE, SAVE_MARKDOWN_ONLY
 
 from PIL import Image, ImageDraw, ImageFont
 import numpy as np
@@ -233,7 +233,8 @@ def process_single_image(image):
 if __name__ == "__main__":
 
     os.makedirs(OUTPUT_PATH, exist_ok=True)
-    os.makedirs(f'{OUTPUT_PATH}/images', exist_ok=True)
+    if not SAVE_MARKDOWN_ONLY:
+        os.makedirs(f'{OUTPUT_PATH}/images', exist_ok=True)
     
     print(f'{Colors.RED}PDF loading .....{Colors.RESET}')
 
@@ -297,18 +298,19 @@ if __name__ == "__main__":
 
         contents_det += content + f'\n{page_num}\n'
 
-        image_draw = img.copy()
-
         matches_ref, matches_images, mathes_other = re_match(content)
-        # print(matches_ref)
-        result_image = process_image_with_refs(image_draw, matches_ref, jdx)
+        if not SAVE_MARKDOWN_ONLY:
+            # Save cropped images + layout visualizations.
+            image_draw = img.copy()
+            result_image = process_image_with_refs(image_draw, matches_ref, jdx)
+            draw_images.append(result_image)
 
-
-        draw_images.append(result_image)
-
-
-        for idx, a_match_image in enumerate(matches_images):
-            content = content.replace(a_match_image, f'![](images/' + str(jdx) + '_' + str(idx) + '.jpg)\n')
+            for idx, a_match_image in enumerate(matches_images):
+                content = content.replace(a_match_image, f'![](images/' + str(jdx) + '_' + str(idx) + '.jpg)\n')
+        else:
+            # Markdown-only mode: strip image refs instead of creating files/links.
+            for a_match_image in matches_images:
+                content = content.replace(a_match_image, '')
 
         for idx, a_match_other in enumerate(mathes_other):
             content = content.replace(a_match_other, '').replace('\\coloneqq', ':=').replace('\\eqqcolon', '=:').replace('\n\n\n\n', '\n\n').replace('\n\n\n', '\n\n')
@@ -326,5 +328,6 @@ if __name__ == "__main__":
         afile.write(contents)
 
 
-    pil_to_pdf_img2pdf(draw_images, pdf_out_path)
+    if not SAVE_MARKDOWN_ONLY:
+        pil_to_pdf_img2pdf(draw_images, pdf_out_path)
 
