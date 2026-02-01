@@ -8,6 +8,9 @@ output/
 # Local clones / experiments
 external/
 
+# Temp download dirs
+.tmp*/
+
 # Local test/sample inputs
 test.pdf
 wolf.pdf

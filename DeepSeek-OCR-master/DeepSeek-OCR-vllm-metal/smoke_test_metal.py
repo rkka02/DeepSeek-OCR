@@ -22,6 +22,34 @@ def _try_print_vllm_platform() -> None:
         print(f"WARNING: could not import vLLM platform info ({type(e).__name__}: {e})")
 
 
+def _ensure_allowed_layer_types() -> None:
+    """Work around transformers/vLLM mismatches for `ALLOWED_LAYER_TYPES`.
+
+    Some vLLM builds import `ALLOWED_LAYER_TYPES` from
+    `transformers.configuration_utils`. If it's missing, vLLM fails to import.
+    We inject a conservative default so the smoke test can proceed.
+    """
+    try:
+        import transformers
+        from transformers import configuration_utils as cu
+
+        if hasattr(cu, "ALLOWED_LAYER_TYPES"):
+            return
+
+        cu.ALLOWED_LAYER_TYPES = (
+            "full_attention",
+            "sliding_attention",
+            "chunked_attention",
+            "linear_attention",
+        )
+        print(
+            "WARNING: Injected transformers.configuration_utils.ALLOWED_LAYER_TYPES "
+            f"(transformers={transformers.__version__})."
+        )
+    except Exception:
+        return
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="vLLM Metal smoke test (text or image).")
     parser.add_argument("--model", required=True, help="HF model name or local path")
@@ -44,6 +72,8 @@ def main() -> int:
         import os
 
         os.environ.setdefault("VLLM_WORKER_MULTIPROC_METHOD", "spawn")
+
+    _ensure_allowed_layer_types()
 
     try:
         from vllm import LLM, SamplingParams

@@ -53,6 +53,29 @@ def batched(items: list, batch_size: int) -> Iterable[list]:
         yield items[i : i + batch_size]
 
 
+def _ensure_allowed_layer_types() -> None:
+    """Work around transformers/vLLM mismatches for `ALLOWED_LAYER_TYPES`."""
+    try:
+        import transformers
+        from transformers import configuration_utils as cu
+
+        if hasattr(cu, "ALLOWED_LAYER_TYPES"):
+            return
+
+        cu.ALLOWED_LAYER_TYPES = (
+            "full_attention",
+            "sliding_attention",
+            "chunked_attention",
+            "linear_attention",
+        )
+        print(
+            "WARNING: Injected transformers.configuration_utils.ALLOWED_LAYER_TYPES "
+            f"(transformers={transformers.__version__})."
+        )
+    except Exception:
+        return
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="DeepSeek-OCR PDF→Markdown using vLLM Metal (Apple Silicon / MLX)."
@@ -94,6 +117,8 @@ def main() -> int:
     # macOS fork-safety (also handled by vllm-metal plugin, but safe to set here too).
     if sys.platform == "darwin":
         os.environ.setdefault("VLLM_WORKER_MULTIPROC_METHOD", "spawn")
+
+    _ensure_allowed_layer_types()
 
     try:
         from vllm import LLM, SamplingParams
