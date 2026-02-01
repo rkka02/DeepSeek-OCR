@@ -34,6 +34,17 @@ If that happens:
 pip install -U "transformers>=4.56.0,<5"
 ```
 
+### If you see `operator torchvision::nms does not exist`
+This usually means `torchvision` is installed but its compiled C++ ops failed to load
+(often due to a torch/torchvision mismatch).
+
+Fix inside `~/.venv-vllm-metal`:
+
+```bash
+pip uninstall -y torchvision torchaudio || true
+pip install -U --force-reinstall --no-cache-dir torch torchvision torchaudio
+```
+
 ### Install only the PDF/image utilities needed by the scripts
 From this folder:
 

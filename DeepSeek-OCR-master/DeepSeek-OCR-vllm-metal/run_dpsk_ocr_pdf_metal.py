@@ -132,6 +132,14 @@ def main() -> int:
             print("Fix (inside this venv):")
             print('  pip install -U "transformers>=4.56.0,<5"')
             print("Note: don't install this repo's root requirements.txt in this venv (it pins transformers==4.46.3).")
+        elif "operator torchvision::nms does not exist" in msg:
+            print("Likely cause: broken/mismatched torchvision build (C++ ops not loaded).")
+            print("Check versions:")
+            print('  python -c "import torch, torchvision; print(torch.__version__, torchvision.__version__)"')
+            print("Fix (reinstall matching torch/torchvision in this venv):")
+            print("  pip uninstall -y torchvision torchaudio || true")
+            print("  pip install -U --force-reinstall --no-cache-dir torch torchvision torchaudio")
+            print("Tip: avoid mixing conda envs when running this venv (deactivate conda if possible).")
         else:
             print("Hint (Apple Silicon): install vllm-metal via:")
             print("  curl -fsSL https://raw.githubusercontent.com/vllm-project/vllm-metal/main/install.sh | bash")
