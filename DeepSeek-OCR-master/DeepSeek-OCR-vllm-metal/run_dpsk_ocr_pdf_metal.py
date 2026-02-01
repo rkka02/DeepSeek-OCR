@@ -13,6 +13,120 @@ REF_BLOCK_PATTERN = re.compile(
 )
 
 
+def _ensure_torchvision_stub_if_broken() -> None:
+    """See smoke_test_metal.py for rationale."""
+    try:
+        import torchvision  # noqa: F401
+
+        return
+    except Exception:
+        pass
+
+    import enum
+    import types
+
+    import numpy as np
+    import torch
+
+    class InterpolationMode(enum.Enum):
+        NEAREST = "nearest"
+        BILINEAR = "bilinear"
+        BICUBIC = "bicubic"
+        LANCZOS = "lanczos"
+
+    class Compose:
+        def __init__(self, transforms):
+            self.transforms = list(transforms or [])
+
+        def __call__(self, x):
+            for t in self.transforms:
+                x = t(x)
+            return x
+
+    class ToTensor:
+        def __call__(self, pic):
+            if isinstance(pic, torch.Tensor):
+                return pic.to(dtype=torch.float32)
+
+            if hasattr(pic, "mode") and hasattr(pic, "size"):
+                arr = np.array(pic, copy=False)
+            else:
+                arr = np.array(pic, copy=False)
+
+            if arr.ndim == 2:
+                arr = arr[:, :, None]
+            if arr.ndim != 3:
+                raise ValueError(f"Unsupported input shape for ToTensor: {arr.shape}")
+
+            if arr.dtype != np.float32:
+                arr = arr.astype(np.float32)
+            if arr.max() > 1.0:
+                arr = arr / 255.0
+
+            arr = np.transpose(arr, (2, 0, 1))
+            return torch.from_numpy(arr)
+
+    class Normalize:
+        def __init__(self, mean, std):
+            self.mean = torch.tensor(mean, dtype=torch.float32)[:, None, None]
+            self.std = torch.tensor(std, dtype=torch.float32)[:, None, None]
+
+        def __call__(self, tensor):
+            if not isinstance(tensor, torch.Tensor):
+                raise TypeError("Normalize expects a torch.Tensor")
+            return (tensor - self.mean) / self.std
+
+    class Resize:
+        def __init__(self, size, interpolation=InterpolationMode.BILINEAR):
+            if isinstance(size, int):
+                self.size = (size, size)
+            else:
+                self.size = tuple(size)
+            self.interpolation = interpolation
+
+        def __call__(self, img):
+            try:
+                from PIL import Image
+            except Exception as e:  # pragma: no cover
+                raise RuntimeError(
+                    "Pillow is required for torchvision Resize stub"
+                ) from e
+
+            if not isinstance(img, Image.Image):
+                raise TypeError("Resize expects a PIL.Image.Image")
+
+            pil_interp = {
+                InterpolationMode.NEAREST: Image.Resampling.NEAREST,
+                InterpolationMode.BILINEAR: Image.Resampling.BILINEAR,
+                InterpolationMode.BICUBIC: Image.Resampling.BICUBIC,
+                InterpolationMode.LANCZOS: Image.Resampling.LANCZOS,
+            }.get(self.interpolation, Image.Resampling.BILINEAR)
+
+            height, width = self.size
+            return img.resize((width, height), resample=pil_interp)
+
+    tv = types.ModuleType("torchvision")
+    transforms = types.ModuleType("torchvision.transforms")
+    functional = types.ModuleType("torchvision.transforms.functional")
+
+    transforms.Compose = Compose
+    transforms.ToTensor = ToTensor
+    transforms.Normalize = Normalize
+    transforms.Resize = Resize
+    transforms.InterpolationMode = InterpolationMode
+
+    functional.InterpolationMode = InterpolationMode
+
+    tv.transforms = transforms
+    tv.__dict__["__version__"] = "0.0.0-stub"
+
+    sys.modules["torchvision"] = tv
+    sys.modules["torchvision.transforms"] = transforms
+    sys.modules["torchvision.transforms.functional"] = functional
+
+    print("WARNING: torchvision is broken; using a minimal torchvision.transforms stub.")
+
+
 def clean_markdown(text: str, *, strip_refs: bool = True) -> str:
     # DeepSeek uses this token sometimes when skip_special_tokens=False.
     text = text.replace("<｜end▁of▁sentence｜>", "")
@@ -119,6 +233,7 @@ def main() -> int:
         os.environ.setdefault("VLLM_WORKER_MULTIPROC_METHOD", "spawn")
 
     _ensure_allowed_layer_types()
+    _ensure_torchvision_stub_if_broken()
 
     try:
         from vllm import LLM, SamplingParams

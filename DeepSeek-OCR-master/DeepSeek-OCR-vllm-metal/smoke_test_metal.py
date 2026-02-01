@@ -9,6 +9,136 @@ def _print_env_diagnostics() -> None:
     print(f"Platform: {platform.system()} {platform.machine()}")
 
 
+def _ensure_torchvision_stub_if_broken() -> None:
+    """Avoid hard failure when torchvision is installed but unusable.
+
+    On some macOS setups, importing torchvision can fail with:
+      RuntimeError: operator torchvision::nms does not exist
+
+    vLLM imports some multi-modal processors that depend on
+    `torchvision.transforms` (ToTensor/Normalize/Resize). If torchvision is
+    broken, we inject a tiny pure-Python stub module that provides the subset
+    vLLM needs.
+    """
+    try:
+        import torchvision  # noqa: F401
+
+        return
+    except Exception as e:
+        msg = str(e)
+        if "operator torchvision::nms does not exist" not in msg:
+            # If torchvision import fails for other reasons (or isn't installed),
+            # we still provide a minimal stub so vLLM can import.
+            pass
+
+    import enum
+    import types
+
+    import numpy as np
+    import torch
+
+    class InterpolationMode(enum.Enum):
+        NEAREST = "nearest"
+        BILINEAR = "bilinear"
+        BICUBIC = "bicubic"
+        LANCZOS = "lanczos"
+
+    class Compose:
+        def __init__(self, transforms):
+            self.transforms = list(transforms or [])
+
+        def __call__(self, x):
+            for t in self.transforms:
+                x = t(x)
+            return x
+
+    class ToTensor:
+        def __call__(self, pic):
+            if isinstance(pic, torch.Tensor):
+                return pic.to(dtype=torch.float32)
+
+            # PIL.Image.Image
+            if hasattr(pic, "mode") and hasattr(pic, "size"):
+                arr = np.array(pic, copy=False)
+            else:
+                arr = np.array(pic, copy=False)
+
+            if arr.ndim == 2:
+                arr = arr[:, :, None]
+            if arr.ndim != 3:
+                raise ValueError(f"Unsupported input shape for ToTensor: {arr.shape}")
+
+            if arr.dtype != np.float32:
+                arr = arr.astype(np.float32)
+            if arr.max() > 1.0:
+                arr = arr / 255.0
+
+            # HWC -> CHW
+            arr = np.transpose(arr, (2, 0, 1))
+            return torch.from_numpy(arr)
+
+    class Normalize:
+        def __init__(self, mean, std):
+            self.mean = torch.tensor(mean, dtype=torch.float32)[:, None, None]
+            self.std = torch.tensor(std, dtype=torch.float32)[:, None, None]
+
+        def __call__(self, tensor):
+            if not isinstance(tensor, torch.Tensor):
+                raise TypeError("Normalize expects a torch.Tensor")
+            return (tensor - self.mean) / self.std
+
+    class Resize:
+        def __init__(self, size, interpolation=InterpolationMode.BILINEAR):
+            if isinstance(size, int):
+                self.size = (size, size)
+            else:
+                self.size = tuple(size)
+            self.interpolation = interpolation
+
+        def __call__(self, img):
+            try:
+                from PIL import Image
+            except Exception as e:  # pragma: no cover
+                raise RuntimeError(
+                    "Pillow is required for torchvision Resize stub"
+                ) from e
+
+            if not isinstance(img, Image.Image):
+                raise TypeError("Resize expects a PIL.Image.Image")
+
+            pil_interp = {
+                InterpolationMode.NEAREST: Image.Resampling.NEAREST,
+                InterpolationMode.BILINEAR: Image.Resampling.BILINEAR,
+                InterpolationMode.BICUBIC: Image.Resampling.BICUBIC,
+                InterpolationMode.LANCZOS: Image.Resampling.LANCZOS,
+            }.get(self.interpolation, Image.Resampling.BILINEAR)
+
+            # PIL expects (width, height)
+            height, width = self.size
+            return img.resize((width, height), resample=pil_interp)
+
+    tv = types.ModuleType("torchvision")
+    transforms = types.ModuleType("torchvision.transforms")
+    functional = types.ModuleType("torchvision.transforms.functional")
+
+    transforms.Compose = Compose
+    transforms.ToTensor = ToTensor
+    transforms.Normalize = Normalize
+    transforms.Resize = Resize
+    transforms.InterpolationMode = InterpolationMode
+
+    functional.InterpolationMode = InterpolationMode
+
+    tv.transforms = transforms
+    tv.__dict__["__version__"] = "0.0.0-stub"
+
+    sys.modules["torchvision"] = tv
+    sys.modules["torchvision.transforms"] = transforms
+    sys.modules["torchvision.transforms.functional"] = functional
+
+    print("WARNING: torchvision is broken; using a minimal torchvision.transforms stub.")
+
+
 def _try_print_vllm_platform() -> None:
     try:
         from vllm.platforms import current_platform
@@ -74,6 +204,7 @@ def main() -> int:
         os.environ.setdefault("VLLM_WORKER_MULTIPROC_METHOD", "spawn")
 
     _ensure_allowed_layer_types()
+    _ensure_torchvision_stub_if_broken()
 
     try:
         from vllm import LLM, SamplingParams

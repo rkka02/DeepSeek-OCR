@@ -45,6 +45,9 @@ pip uninstall -y torchvision torchaudio || true
 pip install -U --force-reinstall --no-cache-dir torch torchvision torchaudio
 ```
 
+If you still hit this error, the scripts in this folder will automatically fall back to a
+minimal pure-Python `torchvision.transforms` stub (enough for vLLM’s image transforms).
+
 ### Install only the PDF/image utilities needed by the scripts
 From this folder:
 
