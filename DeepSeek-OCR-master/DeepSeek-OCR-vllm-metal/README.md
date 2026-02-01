@@ -48,6 +48,11 @@ pip install -U --force-reinstall --no-cache-dir torch torchvision torchaudio
 If you still hit this error, the scripts in this folder will automatically fall back to a
 minimal pure-Python `torchvision.transforms` stub (enough for vLLM’s image transforms).
 
+### If you see `Could not import module 'AutoImageProcessor'`
+This means Transformers’ vision stack is partially unavailable.
+For these scripts, we also auto-install a small runtime stub so **vLLM can import**,
+but some models that rely on `AutoImageProcessor` may still fail at runtime.
+
 ### Install only the PDF/image utilities needed by the scripts
 From this folder:
 

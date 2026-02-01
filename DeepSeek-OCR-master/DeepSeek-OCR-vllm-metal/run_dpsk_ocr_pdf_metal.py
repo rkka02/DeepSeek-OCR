@@ -127,6 +127,35 @@ def _ensure_torchvision_stub_if_broken() -> None:
     print("WARNING: torchvision is broken; using a minimal torchvision.transforms stub.")
 
 
+def _ensure_auto_image_processor_stub_if_missing() -> None:
+    """Ensure `from transformers import AutoImageProcessor` won't crash vLLM import."""
+    try:
+        from transformers import AutoImageProcessor  # noqa: F401
+
+        return
+    except Exception as e:
+        try:
+            import transformers
+        except Exception:
+            return
+
+        class _AutoImageProcessorStub:
+            @classmethod
+            def from_pretrained(cls, *args, **kwargs):
+                raise RuntimeError(
+                    "AutoImageProcessor is not available in this environment. "
+                    "Install vision deps (at least `Pillow`) and ensure your "
+                    "Transformers install is healthy. "
+                    f"Original error: {type(e).__name__}: {e}"
+                )
+
+        transformers.AutoImageProcessor = _AutoImageProcessorStub  # type: ignore[attr-defined]
+        print(
+            "WARNING: AutoImageProcessor could not be imported; installed a stub. "
+            "Text-only models should work; some vision models may not."
+        )
+
+
 def clean_markdown(text: str, *, strip_refs: bool = True) -> str:
     # DeepSeek uses this token sometimes when skip_special_tokens=False.
     text = text.replace("<｜end▁of▁sentence｜>", "")
@@ -234,6 +263,7 @@ def main() -> int:
 
     _ensure_allowed_layer_types()
     _ensure_torchvision_stub_if_broken()
+    _ensure_auto_image_processor_stub_if_missing()
 
     try:
         from vllm import LLM, SamplingParams
