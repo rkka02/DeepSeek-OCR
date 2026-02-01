@@ -19,10 +19,26 @@ curl -fsSL https://raw.githubusercontent.com/vllm-project/vllm-metal/main/instal
 source ~/.venv-vllm-metal/bin/activate
 ```
 
-Then install this repo’s runtime deps (PDF/image utilities):
+### Important: don't downgrade `transformers` in this venv
+vLLM `0.13.0` (installed by `vllm-metal`) requires **`transformers>=4.56.0,<5`**.
+This repo’s root `requirements.txt` pins `transformers==4.46.3` for the HF path.
+If you run `pip install -r ../../requirements.txt` inside `~/.venv-vllm-metal`, vLLM can break with errors like:
+
+```
+ImportError: cannot import name 'ALLOWED_LAYER_TYPES' from 'transformers.configuration_utils'
+```
+
+If that happens:
 
 ```bash
-pip install -r ../../requirements.txt
+pip install -U "transformers>=4.56.0,<5"
+```
+
+### Install only the PDF/image utilities needed by the scripts
+From this folder:
+
+```bash
+pip install -r requirements-metal.txt
 ```
 
 ## 2) Quick smoke test (text-only)
@@ -57,4 +73,3 @@ If it works, `out.mmd` will contain per-page markdown separated by:
 ```
 <--- Page Split --->
 ```
-

@@ -50,9 +50,17 @@ def main() -> int:
     except Exception as e:
         print("ERROR: vLLM is not importable in this environment.")
         print(f"Details: {type(e).__name__}: {e}")
-        print("Hint: install vllm-metal using:")
-        print("  curl -fsSL https://raw.githubusercontent.com/vllm-project/vllm-metal/main/install.sh | bash")
-        print("  source ~/.venv-vllm-metal/bin/activate")
+
+        msg = str(e)
+        if "ALLOWED_LAYER_TYPES" in msg and "transformers.configuration_utils" in msg:
+            print("Likely cause: `transformers` is too old for vLLM 0.13.x.")
+            print("Fix (inside this venv):")
+            print('  pip install -U "transformers>=4.56.0,<5"')
+            print("Note: don't install this repo's root requirements.txt in this venv (it pins transformers==4.46.3).")
+        else:
+            print("Hint: install vllm-metal using:")
+            print("  curl -fsSL https://raw.githubusercontent.com/vllm-project/vllm-metal/main/install.sh | bash")
+            print("  source ~/.venv-vllm-metal/bin/activate")
         return 2
 
     _try_print_vllm_platform()
@@ -112,4 +120,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
